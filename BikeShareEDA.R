@@ -1,6 +1,5 @@
 # Simple EDA of the Dataset. Outputs a plot
 # containing some potentially useful information
-
 library(tidyverse)
 library(vroom)
 library(patchwork)
@@ -99,27 +98,34 @@ final_plot <- (weather_plot | correlations) /
 
 ggsave("EDA_plot.png", final_plot)
 
-# Looking into rush hour
-casual_hour_dist <- ggplot(data) +
+# Looking into rush hour (not holidays
+casual_hour_dist <- ggplot(data[data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-registered_hour_dist <- ggplot(data) +
+registered_hour_dist <- ggplot(data[data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
 (casual_hour_dist | registered_hour_dist)
 
 # Now by day for casual
-casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday", ]) +
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday", ]) +
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday", ]) +
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Sunday", ]) +
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday", ]) +
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday", ]) +
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
-casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday", ]) +
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = casual))
 (casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
   (casual_hour_dist_wednesday |
@@ -128,19 +134,26 @@ casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday", ]) +
      casual_hour_dist_saturday)
 
 # Now by day for registered
-registered_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday", ]) +
+registered_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                             data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
-registered_hour_dist_monday <- ggplot(data[data$weekday == "Monday", ]) +
+registered_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                             data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
-registered_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday", ]) +
+registered_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                              data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
-registered_hour_dist_wednesday <- ggplot(data[data$weekday == "Sunday", ]) +
+registered_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                                data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
-registered_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday", ]) +
+registered_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                               data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
-registered_hour_dist_friday <- ggplot(data[data$weekday == "Friday", ]) +
+registered_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                             data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
-registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday", ]) +
+registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                               data$holiday == 0, ]) +
   geom_point(aes(x = hour, y = registered))
 (registered_hour_dist_sunday |
    registered_hour_dist_monday |
@@ -154,6 +167,382 @@ registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday", ]) +
 # first is between registered and casual users. Casual users
 # experience no rush hour while registered users do. In
 # addition, registered users only see that on certain days.
+
+# exploring season-time interaction
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
+
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
+
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
+
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 4, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
+
+registered_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 1, ]) +
+  geom_point(aes(x = hour, y = registered))
+(registered_hour_dist_sunday | registered_hour_dist_monday | registered_hour_dist_tuesday) /
+  (registered_hour_dist_wednesday |
+     registered_hour_dist_thursday |
+     registered_hour_dist_friday |
+     registered_hour_dist_saturday)
+
+registered_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 2, ]) +
+  geom_point(aes(x = hour, y = registered))
+(registered_hour_dist_sunday | registered_hour_dist_monday | registered_hour_dist_tuesday) /
+  (registered_hour_dist_wednesday |
+     registered_hour_dist_thursday |
+     registered_hour_dist_friday |
+     registered_hour_dist_saturday)
+
+registered_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 3, ]) +
+  geom_point(aes(x = hour, y = registered))
+(registered_hour_dist_sunday | registered_hour_dist_monday | registered_hour_dist_tuesday) /
+  (registered_hour_dist_wednesday |
+     registered_hour_dist_thursday |
+     registered_hour_dist_friday |
+     registered_hour_dist_saturday)
+
+registered_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+registered_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$season == 4, ]) +
+  geom_point(aes(x = hour, y = registered))
+(registered_hour_dist_sunday | registered_hour_dist_monday | registered_hour_dist_tuesday) /
+  (registered_hour_dist_wednesday |
+     registered_hour_dist_thursday |
+     registered_hour_dist_friday |
+     registered_hour_dist_saturday)
+
+# or is weather a better indicator
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$weather == 1, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
+
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$weather == 2, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
+
+casual_hour_dist_sunday <- ggplot(data[data$weekday == "Sunday" &
+                                         data$holiday == 0 &
+                                         data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_monday <- ggplot(data[data$weekday == "Monday" &
+                                         data$holiday == 0 &
+                                         data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_tuesday <- ggplot(data[data$weekday == "Tuesday" &
+                                          data$holiday == 0 &
+                                          data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_wednesday <- ggplot(data[data$weekday == "Wednesday" &
+                                            data$holiday == 0 &
+                                            data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_thursday <- ggplot(data[data$weekday == "Thursday" &
+                                           data$holiday == 0 &
+                                           data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_friday <- ggplot(data[data$weekday == "Friday" &
+                                         data$holiday == 0 &
+                                         data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+casual_hour_dist_saturday <- ggplot(data[data$weekday == "Saturday" &
+                                           data$holiday == 0 &
+                                           data$weather == 3, ]) +
+  geom_point(aes(x = hour, y = casual))
+(casual_hour_dist_sunday | casual_hour_dist_monday | casual_hour_dist_tuesday) /
+  (casual_hour_dist_wednesday |
+     casual_hour_dist_thursday |
+     casual_hour_dist_friday |
+     casual_hour_dist_saturday)
 
 # Looking at the linear relationship
 formula <- count ~ hour_category +
