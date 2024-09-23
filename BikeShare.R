@@ -21,13 +21,11 @@ recipe <- recipe(count ~ ., train_df_dirty) %>%
   step_time(datetime, features = c("hour")) %>%
   step_rename(hour = datetime_hour) %>%
   step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
-  step_poly(hour, degree = 3) %>%
+  step_poly(hour, degree = 10) %>%
   step_mutate(season = as_factor(season)) %>%
   step_rm(datetime) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_corr(all_numeric_predictors(), threshold = 0.5)
-penalized_recipe <- recipe %>%
-  step_normalize(all_numeric_predictors())
 prepped_recipe <- prep(recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 
@@ -86,6 +84,10 @@ vroom_write(poisson_output, "poisson_regression.csv", delim = ",")
 # Penalized regression #
 ########################
 
+# Model-specific recipe
+penalized_recipe <- recipe %>%
+  step_normalize(all_numeric_predictors())
+
 # Create the model
 penalized_model <- linear_reg(penalty = tune(), mixture = tune()) %>%
   set_engine("glmnet") %>%
@@ -122,4 +124,42 @@ penalized_output <- tibble(datetime = test_df_dirty$datetime %>%
                              as.character(),
                            count = penalized_predictions)
 vroom_write(penalized_output, "penalized_regression.csv", delim = ",")
+
+####################
+# Regression Trees #
+####################
+
+tree_model <- decision_tree(cost_complexity = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+
+# Create the workflow
+tree_workflow <- workflow() %>%
+  add_model(tree_model) %>%
+  add_recipe(recipe)
+
+# Cross validate
+param_grid <- grid_regular(cost_complexity(),
+                           levels = 15)
+folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
+cv_results <- tree_workflow %>%
+  tune_grid(resamples = folds,
+            grid = param_grid,
+            metrics = metric_set(rmse))
+best_tune <- cv_results %>%
+  select_best(metric = "rmse")
+
+# Fit model and make predicitons
+tree_fit <- tree_workflow %>%
+  finalize_workflow(best_tune) %>%
+  fit(data = log_train_df_dirty)
+tree_predictions <- predict(tree_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+
+# Write output
+tree_output <- tibble(datetime = test_df_dirty$datetime %>%
+                        format() %>%
+                        as.character(),
+                      count = tree_predictions)
+vroom_write(tree_output, "tree_regression.csv", delim = ",")
 
