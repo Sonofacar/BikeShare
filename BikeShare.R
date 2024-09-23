@@ -11,6 +11,8 @@ log_train_df_dirty <- train_df_dirty %>%
   mutate(count = log(count))
 test_df_dirty <- vroom("test.csv")
 
+# Find the seasonality of hours
+
 # Data cleaning recipe
 recipe <- recipe(count ~ ., train_df_dirty) %>%
   step_mutate(weather = weather %>%
@@ -36,7 +38,7 @@ linear_model <- linear_reg() %>%
 poisson_model <- poisson_reg() %>%
   set_engine("glm") %>%
   set_mode("regression")
-penalized_model <- linear_reg(penalty = 0.1, mixture = 0.5) %>%
+penalized_model <- linear_reg(penalty = 0.05, mixture = 0.5) %>%
   set_engine("glmnet") %>%
   set_mode("regression")
 
@@ -60,8 +62,9 @@ penalized_fit <- fit(penalized_workflow, data = log_train_df_dirty)
 linear_predictions <- predict(linear_fit, new_data = test_df_dirty)$.pred %>%
   exp()
 poisson_predictions <- predict(poisson_fit, new_data = test_df_dirty)$.pred
-penalized_predictions <- predict(penalized_fit, new_data = test_df_dirty)$.pred
-
+penalized_predictions <- predict(penalized_fit,
+                                 new_data = test_df_dirty)$.pred %>%
+  exp()
 
 # Write output
 linear_output <- tibble(datetime = test_df_dirty$datetime %>%
