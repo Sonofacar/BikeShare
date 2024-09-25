@@ -140,7 +140,7 @@ tree_workflow <- workflow() %>%
 
 # Cross validate
 param_grid <- grid_regular(cost_complexity(),
-                           levels = 15)
+                           levels = 30)
 folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
 cv_results <- tree_workflow %>%
   tune_grid(resamples = folds,
@@ -162,4 +162,45 @@ tree_output <- tibble(datetime = test_df_dirty$datetime %>%
                         as.character(),
                       count = tree_predictions)
 vroom_write(tree_output, "tree_regression.csv", delim = ",")
+
+##################
+# Random Forrest #
+##################
+
+forest_model <- rand_forest(mtry = tune(),
+                            min_n = tune(),
+                            trees = 1000) %>%
+  set_engine("ranger") %>%
+  set_mode("regression")
+
+# Create the workflow
+forest_workflow <- workflow() %>%
+  add_model(forest_model) %>%
+  add_recipe(recipe)
+
+# Cross validate
+param_grid <- grid_regular(mtry(range = c(1, 20)),
+                           min_n(),
+                           levels = 20)
+folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
+cv_results <- forest_workflow %>%
+  tune_grid(resamples = folds,
+            grid = param_grid,
+            metrics = metric_set(rmse))
+best_tune <- cv_results %>%
+  select_best(metric = "rmse")
+
+# Fit model and make predicitons
+forest_fit <- forest_workflow %>%
+  finalize_workflow(best_tune) %>%
+  fit(data = log_train_df_dirty)
+forest_predictions <- predict(forest_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+
+# Write output
+forest_output <- tibble(datetime = test_df_dirty$datetime %>%
+                          format() %>%
+                          as.character(),
+                        count = forest_predictions)
+vroom_write(forest_output, "forest_regression.csv", delim = ",")
 
