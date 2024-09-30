@@ -20,11 +20,23 @@ recipe <- recipe(count ~ ., train_df_dirty) %>%
   step_time(datetime, features = c("hour")) %>%
   step_rename(hour = datetime_hour) %>%
   step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
-  step_poly(hour, degree = 10) %>%
   step_mutate(season = as_factor(season)) %>%
   step_rm(datetime) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_corr(all_numeric_predictors(), threshold = 0.5)
+log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
+  step_mutate(weather = weather %>%
+                replace(weather == 4, 3) %>%
+                as_factor()) %>%
+  step_time(datetime, features = c("hour")) %>%
+  step_rename(hour = datetime_hour) %>%
+  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
+  step_mutate(season = as_factor(season)) %>%
+  step_rm(datetime) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_corr(all_numeric_predictors(), threshold = 0.5)
+linear_recipe <- recipe %>%
+  step_poly(hour, degree = 10)
 prepped_recipe <- prep(recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 
@@ -44,7 +56,7 @@ linear_model <- linear_reg() %>%
 # Create the workflow
 linear_workflow <- workflow() %>%
   add_model(linear_model) %>%
-  add_recipe(recipe)
+  add_recipe(linear_recipe)
 
 # Fit model and make predictions
 linear_fit <- fit(linear_workflow, data = log_train_df_dirty)
@@ -70,7 +82,7 @@ poisson_model <- poisson_reg() %>%
 # Create the workflow
 poisson_workflow <- workflow() %>%
   add_model(poisson_model) %>%
-  add_recipe(recipe)
+  add_recipe(linear_recipe)
 
 # Fit model and make predictions
 poisson_fit <- fit(poisson_workflow, data = train_df_dirty)
@@ -88,7 +100,7 @@ vroom_write(poisson_output, "poisson_regression.csv", delim = ",")
 ########################
 
 # Model-specific recipe
-penalized_recipe <- recipe %>%
+penalized_recipe <- linear_recipe %>%
   step_normalize(all_numeric_predictors())
 
 # Create the model
@@ -132,6 +144,7 @@ vroom_write(penalized_output, "penalized_regression.csv", delim = ",")
 # Regression Trees #
 ####################
 
+# Create the model
 tree_model <- decision_tree(cost_complexity = tune()) %>%
   set_engine("rpart") %>%
   set_mode("regression")
@@ -170,6 +183,7 @@ vroom_write(tree_output, "tree_regression.csv", delim = ",")
 # Random Forrest #
 ##################
 
+# Create the model
 forest_model <- rand_forest(mtry = tune(),
                             min_n = tune(),
                             trees = 200) %>%
@@ -182,7 +196,7 @@ forest_workflow <- workflow() %>%
   add_recipe(recipe)
 
 # Cross validate
-param_grid <- grid_regular(mtry(range = c(1, 20)),
+param_grid <- grid_regular(mtry(range = c(1, 11)),
                            min_n(),
                            levels = 10)
 forest_cv <- forest_workflow %>%
@@ -243,4 +257,51 @@ stack_output <- tibble(datetime = test_df_dirty$datetime %>%
                          as.character(),
                        count = forest_predictions)
 vroom_write(stack_output, "stacked_models.csv", delim = ",")
+
+# List of models to do:
+# - BART
+# - Boosted Trees
+# - GAM
+# - MARS
+# - MLP
+# - K-nearest neighbor
+# - SVM (either poly or RBF)
+
+#################################
+# Support Vector Machines (RBF) #
+#################################
+
+# Create the model
+svm_model <- svm_rbf(cost = tune()) %>%
+  set_engine("kernlab") %>%
+  set_mode("regression")
+
+# Create the workflow
+svm_workflow <- workflow() %>%
+  add_model(svm_model) %>%
+  add_recipe(log_recipe)
+
+# Cross validate
+param_grid <- grid_regular(cost(), levels = 10)
+svm_cv <- svm_workflow %>%
+  tune_grid(resamples = folds,
+            grid = param_grid,
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+best_tune <- svm_cv %>%
+  select_best(metric = "rmse")
+
+# Fit model and make predictions
+svm_fit <- svm_workflow %>%
+  finalize_workflow(best_tune) %>%
+  fit(data = log_train_df_dirty)
+svm_predictions <- predict(svm_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+
+# Write output
+svm_output <- tibble(datetime = test_df_dirty$datetime %>%
+                       format() %>%
+                       as.character(),
+                     count = svm_predictions)
+vroom_write(svm_output, "svm_rbf.csv", delim = ",")
 
