@@ -258,15 +258,6 @@ stack_output <- tibble(datetime = test_df_dirty$datetime %>%
                        count = forest_predictions)
 vroom_write(stack_output, "stacked_models.csv", delim = ",")
 
-# List of models to do:
-# - BART
-# - Boosted Trees
-# - GAM
-# - MARS
-# - MLP
-# - K-nearest neighbor
-# - SVM (either poly or RBF)
-
 #################################
 # Support Vector Machines (RBF) #
 #################################
@@ -304,4 +295,81 @@ svm_output <- tibble(datetime = test_df_dirty$datetime %>%
                        as.character(),
                      count = svm_predictions)
 vroom_write(svm_output, "svm_rbf.csv", delim = ",")
+
+########
+# Bart #
+########
+
+# Create the model
+bart_model <- parsnip::bart(trees = 500) %>%
+  set_engine("dbarts") %>%
+  set_mode("regression")
+
+# Create the workflow
+bart_workflow <- workflow() %>%
+  add_model(bart_model) %>%
+  add_recipe(log_recipe)
+
+# Fit model and make predictions
+bart_fit <- bart_workflow %>%
+  fit(data = log_train_df_dirty)
+bart_predictions <- predict(bart_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+
+# Write output
+bart_output <- tibble(datetime = test_df_dirty$datetime %>%
+                       format() %>%
+                       as.character(),
+                     count = bart_predictions)
+vroom_write(bart_output, "bart_regression.csv", delim = ",")
+
+#######
+# GAM #
+#######
+
+# Create the model
+# Create the workflow
+# Cross validate
+# Fit model and make predictions
+# Write output
+
+########
+# MARS #
+########
+
+# Create the model
+# Create the workflow
+# Cross validate
+# Fit model and make predictions
+# Write output
+
+#######
+# MLP #
+#######
+
+# Create the model
+# Create the workflow
+# Cross validate
+# Fit model and make predictions
+# Write output
+
+#################
+# Boosted Trees #
+#################
+
+# Create the model
+# Create the workflow
+# Cross validate
+# Fit model and make predictions
+# Write output
+
+######################
+# K-nearest neighbor #
+######################
+
+# Create the model
+# Create the workflow
+# Cross validate
+# Fit model and make predictions
+# Write output
 
