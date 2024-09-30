@@ -3,6 +3,7 @@ library(tidyverse)
 library(tidymodels)
 library(vroom)
 library(poissonreg)
+library(stacks)
 
 # Read in the data
 train_df_dirty <- vroom("train.csv") %>%
@@ -10,8 +11,6 @@ train_df_dirty <- vroom("train.csv") %>%
 log_train_df_dirty <- train_df_dirty %>%
   mutate(count = log(count))
 test_df_dirty <- vroom("test.csv")
-
-# Find the seasonality of hours
 
 # Data cleaning recipe
 recipe <- recipe(count ~ ., train_df_dirty) %>%
@@ -28,6 +27,10 @@ recipe <- recipe(count ~ ., train_df_dirty) %>%
   step_corr(all_numeric_predictors(), threshold = 0.5)
 prepped_recipe <- prep(recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
+
+# Set up folds
+folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
+poisson_folds <- vfold_cv(train_df_dirty, v = 10, repeats = 1)
 
 #####################
 # Linear regression #
@@ -102,12 +105,12 @@ penalized_workflow <- workflow() %>%
 param_grid <- grid_regular(penalty(),
                            mixture(),
                            levels = 10)
-folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
-cv_results <- penalized_workflow %>%
+penalized_cv <- penalized_workflow %>%
   tune_grid(resamples = folds,
             grid = param_grid,
-            metrics = metric_set(rmse))
-best_tune <- cv_results %>%
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+best_tune <- penalized_cv %>%
   select_best(metric = "rmse")
 
 # Fit model and make predictions
@@ -141,12 +144,12 @@ tree_workflow <- workflow() %>%
 # Cross validate
 param_grid <- grid_regular(cost_complexity(),
                            levels = 30)
-folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
-cv_results <- tree_workflow %>%
+tree_cv <- tree_workflow %>%
   tune_grid(resamples = folds,
             grid = param_grid,
-            metrics = metric_set(rmse))
-best_tune <- cv_results %>%
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+best_tune <- tree_cv %>%
   select_best(metric = "rmse")
 
 # Fit model and make predicitons
@@ -169,7 +172,7 @@ vroom_write(tree_output, "tree_regression.csv", delim = ",")
 
 forest_model <- rand_forest(mtry = tune(),
                             min_n = tune(),
-                            trees = 1000) %>%
+                            trees = 200) %>%
   set_engine("ranger") %>%
   set_mode("regression")
 
@@ -181,13 +184,13 @@ forest_workflow <- workflow() %>%
 # Cross validate
 param_grid <- grid_regular(mtry(range = c(1, 20)),
                            min_n(),
-                           levels = 20)
-folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
-cv_results <- forest_workflow %>%
+                           levels = 10)
+forest_cv <- forest_workflow %>%
   tune_grid(resamples = folds,
             grid = param_grid,
-            metrics = metric_set(rmse))
-best_tune <- cv_results %>%
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+best_tune <- forest_cv %>%
   select_best(metric = "rmse")
 
 # Fit model and make predicitons
@@ -203,4 +206,41 @@ forest_output <- tibble(datetime = test_df_dirty$datetime %>%
                           as.character(),
                         count = forest_predictions)
 vroom_write(forest_output, "forest_regression.csv", delim = ",")
+
+#################
+# Stacked model #
+#################
+
+# Fit linear and poisson models as resampling objects
+linear_resample_fit <- fit_resamples(linear_workflow,
+                                     resamples = folds,
+                                     metrics = metric_set(rmse),
+                                     control = control_stack_resamples())
+poisson_resample_fit <- fit_resamples(poisson_workflow,
+                                      resamples = poisson_folds,
+                                      metrics = metric_set(rmse),
+                                      control = control_stack_resamples())
+
+# Specify the stack
+stack <- stacks() %>%
+  #add_candidates(linear_resample_fit) %>%
+  #add_candidates(poisson_resample_fit) %>%
+  add_candidates(penalized_cv) %>%
+  add_candidates(tree_cv) %>%
+  add_candidates(forest_cv)
+
+# Create the stack model
+stack_model <- stack %>%
+  blend_predictions() %>%
+  fit_members()
+
+# Make predicitons
+stack_predictions <- predict(stack_model, new_data = test_df_dirty)$.pred
+
+# Write output
+stack_output <- tibble(datetime = test_df_dirty$datetime %>%
+                         format() %>%
+                         as.character(),
+                       count = forest_predictions)
+vroom_write(stack_output, "stacked_models.csv", delim = ",")
 
