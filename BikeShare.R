@@ -348,10 +348,41 @@ vroom_write(bart_output, "bart_regression.csv", delim = ",")
 #######
 
 # Create the model
+mlp_model <- mlp(hidden_units = tune(),
+                 epochs = tune()) %>%
+  set_engine("nnet") %>%
+  set_mode("regression")
+
 # Create the workflow
+mlp_workflow <- workflow() %>%
+  add_model(mlp_model) %>%
+  add_recipe(log_recipe)
+
 # Cross validate
+param_grid <- grid_regular(hidden_units(),
+                           epochs(),
+                           levels = 10)
+mlp_cv <- mlp_workflow %>%
+  tune_grid(resamples = folds,
+            grid = param_grid,
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+best_tune <- mlp_cv %>%
+  select_best(metric = "rmse")
+
 # Fit model and make predictions
+mlp_fit <- mlp_workflow %>%
+  finalize_workflow(best_tune) %>%
+  fit(data = log_train_df_dirty)
+mlp_predictions <- predict(mlp_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+
 # Write output
+mlp_output <- tibble(datetime = test_df_dirty$datetime %>%
+                       format() %>%
+                       as.character(),
+                     count = mlp_predictions)
+vroom_write(mlp_output, "mlp_model.csv", delim = ",")
 
 #################
 # Boosted Trees #
