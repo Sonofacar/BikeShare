@@ -221,43 +221,6 @@ forest_output <- tibble(datetime = test_df_dirty$datetime %>%
                         count = forest_predictions)
 vroom_write(forest_output, "forest_regression.csv", delim = ",")
 
-#################
-# Stacked model #
-#################
-
-# Fit linear and poisson models as resampling objects
-linear_resample_fit <- fit_resamples(linear_workflow,
-                                     resamples = folds,
-                                     metrics = metric_set(rmse),
-                                     control = control_stack_resamples())
-poisson_resample_fit <- fit_resamples(poisson_workflow,
-                                      resamples = poisson_folds,
-                                      metrics = metric_set(rmse),
-                                      control = control_stack_resamples())
-
-# Specify the stack
-stack <- stacks() %>%
-  #add_candidates(linear_resample_fit) %>%
-  #add_candidates(poisson_resample_fit) %>%
-  add_candidates(penalized_cv) %>%
-  add_candidates(tree_cv) %>%
-  add_candidates(forest_cv)
-
-# Create the stack model
-stack_model <- stack %>%
-  blend_predictions() %>%
-  fit_members()
-
-# Make predicitons
-stack_predictions <- predict(stack_model, new_data = test_df_dirty)$.pred
-
-# Write output
-stack_output <- tibble(datetime = test_df_dirty$datetime %>%
-                         format() %>%
-                         as.character(),
-                       count = forest_predictions)
-vroom_write(stack_output, "stacked_models.csv", delim = ",")
-
 #################################
 # Support Vector Machines (RBF) #
 #################################
@@ -403,4 +366,41 @@ vroom_write(mlp_output, "mlp_model.csv", delim = ",")
 # Cross validate
 # Fit model and make predictions
 # Write output
+
+#################
+# Stacked model #
+#################
+
+# Fit linear and poisson models as resampling objects
+linear_resample_fit <- fit_resamples(linear_workflow,
+                                     resamples = folds,
+                                     metrics = metric_set(rmse),
+                                     control = control_stack_resamples())
+poisson_resample_fit <- fit_resamples(poisson_workflow,
+                                      resamples = poisson_folds,
+                                      metrics = metric_set(rmse),
+                                      control = control_stack_resamples())
+
+# Specify the stack
+stack <- stacks() %>%
+  #add_candidates(linear_resample_fit) %>%
+  #add_candidates(poisson_resample_fit) %>%
+  add_candidates(penalized_cv) %>%
+  add_candidates(tree_cv) %>%
+  add_candidates(forest_cv)
+
+# Create the stack model
+stack_model <- stack %>%
+  blend_predictions() %>%
+  fit_members()
+
+# Make predicitons
+stack_predictions <- predict(stack_model, new_data = test_df_dirty)$.pred
+
+# Write output
+stack_output <- tibble(datetime = test_df_dirty$datetime %>%
+                         format() %>%
+                         as.character(),
+                       count = forest_predictions)
+vroom_write(stack_output, "stacked_models.csv", delim = ",")
 
