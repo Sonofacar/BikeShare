@@ -36,7 +36,8 @@ log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_corr(all_numeric_predictors(), threshold = 0.5)
 linear_recipe <- recipe %>%
-  step_poly(hour, degree = 10)
+  #step_poly(hour, degree = 10)
+  step_spline_natural(hour, deg_free = 20)
 prepped_recipe <- prep(recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 
