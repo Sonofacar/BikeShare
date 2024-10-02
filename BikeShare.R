@@ -13,48 +13,41 @@ log_train_df_dirty <- train_df_dirty %>%
 test_df_dirty <- vroom("test.csv")
 
 # Data cleaning recipe
+cleaner <- function(r){
+  r %>%
+    step_rm(temp) %>%
+    step_mutate(weather = weather %>%
+                  replace(weather == 4, 3) %>%
+                  as_factor()) %>%
+    step_time(datetime, features = c("hour")) %>%
+    step_date(datetime, features = c("dow", "month", "year")) %>%
+    step_rename(hour = datetime_hour,
+                dow = datetime_dow,
+                month = datetime_month,
+                year = datetime_year) %>%
+    step_mutate(season = as_factor(season)) %>%
+    step_mutate(holiday = as_factor(holiday)) %>%
+    step_mutate(workingday = as_factor(workingday)) %>%
+    step_mutate(hour = as_factor(hour)) %>% # this is *very* important
+    step_mutate(dow = as_factor(dow)) %>%
+    step_mutate(month = as_factor(month)) %>%
+    step_mutate(year = as_factor(year)) %>%
+    step_mutate(rush_hour = as_factor(hour %in% c(7, 8, 17, 18))) %>%
+    step_interact(terms = ~ hour:workingday) %>%
+    step_interact(terms = ~ hour:weather) %>%
+    step_interact(terms = ~ rush_hour:workingday) %>%
+    step_interact(terms = ~ atemp:hour) %>%
+    step_interact(terms = ~ weather:windspeed) %>%
+    step_interact(terms = ~ weather:atemp) %>%
+    step_normalize(all_double_predictors()) %>%
+    step_dummy(all_factor_predictors()) %>%
+    step_rm(datetime) %>%
+    return()
+}
 recipe <- recipe(count ~ ., train_df_dirty) %>%
-  step_rm(temp) %>%
-  step_mutate(weather = weather %>%
-                replace(weather == 4, 3) %>%
-                as_factor()) %>%
-  step_mutate(weekend = as_factor((holiday == 0) & (workingday == 0))) %>%
-  step_time(datetime, features = c("hour")) %>%
-  step_date(datetime, features = c("dow", "month", "year")) %>%
-  step_rename(hour = datetime_hour,
-              dow = datetime_dow,
-              month = datetime_month,
-              year = datetime_year) %>%
-  step_mutate(season = as_factor(season)) %>%
-  step_mutate(holiday = as_factor(holiday)) %>%
-  step_mutate(workingday = as_factor(workingday)) %>%
-  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
-  step_mutate(hour = as_factor(hour)) %>%
-  step_interact(terms = ~ hour:workingday) %>%
-  step_interact(terms = ~ rush_hour:workingday) %>%
-  step_dummy(all_factor_predictors()) %>%
-  step_rm(datetime)
+  cleaner()
 log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
-  step_rm(temp) %>%
-  step_mutate(weather = weather %>%
-                replace(weather == 4, 3) %>%
-                as_factor()) %>%
-  step_mutate(weekend = as_factor((holiday == 0) & (workingday == 0))) %>%
-  step_time(datetime, features = c("hour")) %>%
-  step_date(datetime, features = c("dow", "month", "year")) %>%
-  step_rename(hour = datetime_hour,
-              dow = datetime_dow,
-              month = datetime_month,
-              year = datetime_year) %>%
-  step_mutate(season = as_factor(season)) %>%
-  step_mutate(holiday = as_factor(holiday)) %>%
-  step_mutate(workingday = as_factor(workingday)) %>%
-  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
-  step_mutate(hour = as_factor(hour)) %>%
-  step_interact(terms = ~ hour:workingday) %>%
-  step_interact(terms = ~ rush_hour:workingday) %>%
-  step_dummy(all_factor_predictors()) %>%
-  step_rm(datetime)
+  cleaner()
 prepped_recipe <- prep(recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 
