@@ -25,20 +25,27 @@ recipe <- recipe(count ~ ., train_df_dirty) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_corr(all_numeric_predictors(), threshold = 0.5)
 log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
+  step_rm(temp) %>%
   step_mutate(weather = weather %>%
                 replace(weather == 4, 3) %>%
                 as_factor()) %>%
+  step_mutate(weekend = (holiday == 0) & (workingday == 0)) %>%
   step_time(datetime, features = c("hour")) %>%
-  step_rename(hour = datetime_hour) %>%
-  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
+  step_date(datetime, features = c("dow", "month", "year")) %>%
+  step_rename(hour = datetime_hour,
+              dow = datetime_dow,
+              month = datetime_month,
+              year = datetime_year) %>%
   step_mutate(season = as_factor(season)) %>%
-  step_rm(datetime) %>%
-  step_dummy(all_nominal_predictors()) %>%
-  step_corr(all_numeric_predictors(), threshold = 0.5)
-linear_recipe <- recipe %>%
-  #step_poly(hour, degree = 10)
-  step_spline_natural(hour, deg_free = 20)
-prepped_recipe <- prep(recipe)
+  step_mutate(holiday = as_factor(holiday)) %>%
+  step_mutate(workingday = as_factor(workingday)) %>%
+  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
+  step_mutate(hour = as_factor(hour)) %>%
+  step_interact(terms = ~ hour:workingday) %>%
+  step_interact(terms = ~ rush_hour:workingday) %>%
+  step_dummy(all_factor_predictors()) %>%
+  step_rm(datetime)
+prepped_recipe <- prep(tmp_recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 
 # Set up folds
@@ -57,7 +64,7 @@ linear_model <- linear_reg() %>%
 # Create the workflow
 linear_workflow <- workflow() %>%
   add_model(linear_model) %>%
-  add_recipe(linear_recipe)
+  add_recipe(log_recipe)
 
 # Fit model and make predictions
 linear_fit <- fit(linear_workflow, data = log_train_df_dirty)
@@ -153,7 +160,7 @@ tree_model <- decision_tree(cost_complexity = tune()) %>%
 # Create the workflow
 tree_workflow <- workflow() %>%
   add_model(tree_model) %>%
-  add_recipe(recipe)
+  add_recipe(log_recipe)
 
 # Cross validate
 param_grid <- grid_regular(cost_complexity(),
@@ -381,6 +388,10 @@ poisson_resample_fit <- fit_resamples(poisson_workflow,
                                       resamples = poisson_folds,
                                       metrics = metric_set(rmse),
                                       control = control_stack_resamples())
+bart_resample_fit <- fit_resamples(bart_workflow,
+                                   resamples = folds,
+                                   metrics = metric_set(rmse),
+                                   control = control_stack_resamples())
 
 # Specify the stack
 stack <- stacks() %>%
@@ -388,6 +399,9 @@ stack <- stacks() %>%
   #add_candidates(poisson_resample_fit) %>%
   add_candidates(penalized_cv) %>%
   add_candidates(tree_cv) %>%
+  add_candidates(svm_cv) %>%
+  add_candidates(mlp_cv) %>%
+  add_candidates(bart_resample_fit) %>%
   add_candidates(forest_cv)
 
 # Create the stack model
