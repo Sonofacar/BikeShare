@@ -14,22 +14,11 @@ test_df_dirty <- vroom("test.csv")
 
 # Data cleaning recipe
 recipe <- recipe(count ~ ., train_df_dirty) %>%
-  step_mutate(weather = weather %>%
-                replace(weather == 4, 3) %>%
-                as_factor()) %>%
-  step_time(datetime, features = c("hour")) %>%
-  step_rename(hour = datetime_hour) %>%
-  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
-  step_mutate(season = as_factor(season)) %>%
-  step_rm(datetime) %>%
-  step_dummy(all_nominal_predictors()) %>%
-  step_corr(all_numeric_predictors(), threshold = 0.5)
-log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
   step_rm(temp) %>%
   step_mutate(weather = weather %>%
                 replace(weather == 4, 3) %>%
                 as_factor()) %>%
-  step_mutate(weekend = (holiday == 0) & (workingday == 0)) %>%
+  step_mutate(weekend = as_factor((holiday == 0) & (workingday == 0))) %>%
   step_time(datetime, features = c("hour")) %>%
   step_date(datetime, features = c("dow", "month", "year")) %>%
   step_rename(hour = datetime_hour,
@@ -45,7 +34,28 @@ log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
   step_interact(terms = ~ rush_hour:workingday) %>%
   step_dummy(all_factor_predictors()) %>%
   step_rm(datetime)
-prepped_recipe <- prep(tmp_recipe)
+log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
+  step_rm(temp) %>%
+  step_mutate(weather = weather %>%
+                replace(weather == 4, 3) %>%
+                as_factor()) %>%
+  step_mutate(weekend = as_factor((holiday == 0) & (workingday == 0))) %>%
+  step_time(datetime, features = c("hour")) %>%
+  step_date(datetime, features = c("dow", "month", "year")) %>%
+  step_rename(hour = datetime_hour,
+              dow = datetime_dow,
+              month = datetime_month,
+              year = datetime_year) %>%
+  step_mutate(season = as_factor(season)) %>%
+  step_mutate(holiday = as_factor(holiday)) %>%
+  step_mutate(workingday = as_factor(workingday)) %>%
+  step_mutate(rush_hour = as.integer(hour %in% c(7, 8, 17, 18))) %>%
+  step_mutate(hour = as_factor(hour)) %>%
+  step_interact(terms = ~ hour:workingday) %>%
+  step_interact(terms = ~ rush_hour:workingday) %>%
+  step_dummy(all_factor_predictors()) %>%
+  step_rm(datetime)
+prepped_recipe <- prep(recipe)
 clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 
 # Set up folds
@@ -90,7 +100,7 @@ poisson_model <- poisson_reg() %>%
 # Create the workflow
 poisson_workflow <- workflow() %>%
   add_model(poisson_model) %>%
-  add_recipe(linear_recipe)
+  add_recipe(recipe)
 
 # Fit model and make predictions
 poisson_fit <- fit(poisson_workflow, data = train_df_dirty)
@@ -108,7 +118,7 @@ vroom_write(poisson_output, "poisson_regression.csv", delim = ",")
 ########################
 
 # Model-specific recipe
-penalized_recipe <- linear_recipe %>%
+penalized_recipe <- log_recipe %>%
   step_normalize(all_numeric_predictors())
 
 # Create the model
@@ -124,7 +134,7 @@ penalized_workflow <- workflow() %>%
 # Cross validate
 param_grid <- grid_regular(penalty(),
                            mixture(),
-                           levels = 10)
+                           levels = 20)
 penalized_cv <- penalized_workflow %>%
   tune_grid(resamples = folds,
             grid = param_grid,
