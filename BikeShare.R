@@ -6,7 +6,7 @@ library(poissonreg)
 library(stacks)
 
 # Read in the data
-offset <- 0.00000001
+offset <- 0.5
 raw_train <- vroom("train.csv")
 train_df_dirty <- raw_train %>%
   select(-casual, -registered)
@@ -25,6 +25,7 @@ log_registered_df_dirty <- raw_train %>%
 cleaner <- function(r) {
   r %>%
     step_rm(temp) %>%
+    step_normalize(atemp, humidity, windspeed) %>%
     step_mutate(weather = weather %>%
                   replace(weather == 4, 3) %>%
                   as_factor()) %>%
@@ -51,7 +52,6 @@ cleaner <- function(r) {
     step_interact(terms = ~ weather:atemp) %>%
     step_interact(terms = ~ night:dow) %>%
     step_spline_natural(atemp, deg_free = 4) %>%
-    #step_normalize(all_double_predictors()) %>%
     step_dummy(all_factor_predictors()) %>%
     step_rm(datetime) %>%
     return()
@@ -71,6 +71,8 @@ clean_data <- bake(prepped_recipe, new_data = train_df_dirty)
 # Set up folds
 folds <- vfold_cv(log_train_df_dirty, v = 10, repeats = 1)
 poisson_folds <- vfold_cv(train_df_dirty, v = 10, repeats = 1)
+casual_folds <- vfold_cv(log_casual_df_dirty, v = 10, repeats = 1)
+registered_folds <- vfold_cv(log_registered_df_dirty, v = 10, repeats = 1)
 
 #####################
 # Linear regression #
@@ -126,6 +128,7 @@ split_linear_output <- tibble(datetime = test_df_dirty$datetime %>%
                                 as.character(),
                               count = casual_linear_predictions +
                                 registered_linear_predictions)
+split_linear_output[split_linear_output$count < 0, "count"] <- 0
 vroom_write(split_linear_output, "split_linear_regression.csv", delim = ",")
 
 ######################
@@ -197,6 +200,65 @@ penalized_output <- tibble(datetime = test_df_dirty$datetime %>%
                              as.character(),
                            count = penalized_predictions)
 vroom_write(penalized_output, "penalized_regression.csv", delim = ",")
+
+# Now do the same thing but for casual and registered users
+# Model-specific recipes
+casual_penalized_recipe <- log_casual_recipe %>%
+  step_normalize(all_numeric_predictors())
+registered_penalized_recipe <- log_registered_recipe %>%
+  step_normalize(all_numeric_predictors())
+
+# Create the workflows
+casual_penalized_workflow <- workflow() %>%
+  add_model(penalized_model) %>%
+  add_recipe(casual_penalized_recipe)
+registered_penalized_workflow <- workflow() %>%
+  add_model(penalized_model) %>%
+  add_recipe(registered_penalized_recipe)
+
+# Cross validate
+param_grid <- grid_regular(penalty(),
+                           mixture(),
+                           levels = 20)
+casual_penalized_cv <- casual_penalized_workflow %>%
+  tune_grid(resamples = casual_folds,
+            grid = param_grid,
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+casual_best_tune <- casual_penalized_cv %>%
+  select_best(metric = "rmse")
+registered_penalized_cv <- registered_penalized_workflow %>%
+  tune_grid(resamples = registered_folds,
+            grid = param_grid,
+            metrics = metric_set(rmse),
+            control = control_stack_grid())
+registered_best_tune <- registered_penalized_cv %>%
+  select_best(metric = "rmse")
+
+# Fit models and make predictions
+casual_penalized_fit <- casual_penalized_workflow %>%
+  finalize_workflow(casual_best_tune) %>%
+  fit(data = log_casual_df_dirty)
+casual_penalized_predictions <- predict(casual_penalized_fit,
+                                        new_data = test_df_dirty)$.pred %>%
+  exp() %>%
+  `-`(offset)
+registered_penalized_fit <- registered_penalized_workflow %>%
+  finalize_workflow(registered_best_tune) %>%
+  fit(data = log_registered_df_dirty)
+registered_penalized_predictions <- predict(registered_penalized_fit,
+                                            new_data = test_df_dirty)$.pred %>%
+  exp() %>%
+  `-`(offset)
+
+# Write output
+split_penalized_output <- tibble(datetime = test_df_dirty$datetime %>%
+                                   format() %>%
+                                   as.character(),
+                                 count = casual_penalized_predictions +
+                                   registered_penalized_predictions)
+split_penalized_output[split_penalized_output$count < 0, "count"] <- 0
+vroom_write(split_penalized_output, "split_penalized_regression.csv", delim = ",")
 
 ####################
 # Regression Trees #
