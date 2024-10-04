@@ -13,11 +13,13 @@ train_df_dirty <- raw_train %>%
 log_train_df_dirty <- train_df_dirty %>%
   mutate(count = log(count))
 test_df_dirty <- vroom("test.csv")
-log_casual_df_dirty <- raw_train %>%
-  select(-count, -registered) %>%
+casual_df_dirty <- raw_train %>%
+  select(-count, -registered)
+registered_df_dirty <- raw_train %>%
+  select(-count, -casual)
+log_casual_df_dirty <- casual_df_dirty %>%
   mutate(casual = log(casual + offset))
-log_registered_df_dirty <- raw_train %>%
-  select(-count, -casual) %>%
+log_registered_df_dirty <- registered_df_dirty %>%
   mutate(registered = log(registered + offset))
 
 # Data cleaning recipe
@@ -58,6 +60,10 @@ cleaner <- function(r) {
 }
 # nolint end
 recipe <- recipe(count ~ ., train_df_dirty) %>%
+  cleaner()
+casual_recipe <- recipe(casual ~ ., casual_df_dirty) %>%
+  cleaner()
+registered_recipe <- recipe(registered ~ ., registered_df_dirty) %>%
   cleaner()
 log_recipe <- recipe(count ~ ., log_train_df_dirty) %>%
   cleaner()
@@ -155,6 +161,38 @@ poisson_output <- tibble(datetime = test_df_dirty$datetime %>%
                            as.character(),
                          count = poisson_predictions)
 vroom_write(poisson_output, "poisson_regression.csv", delim = ",")
+
+# Now do the same thing for casual and registered users
+# Zero inflate the data
+zinf_casual_df_dirty <- casual_df_dirty %>%
+  mutate(casual = casual + 1)
+zinf_registered_df_dirty <- registered_df_dirty %>%
+  mutate(registered = registered + 1)
+
+# Create the workflow
+casual_poisson_workflow <- workflow() %>%
+  add_model(poisson_model) %>%
+  add_recipe(casual_recipe)
+registered_poisson_workflow <- workflow() %>%
+  add_model(poisson_model) %>%
+  add_recipe(registered_recipe)
+
+# Fit model and make predictions
+casual_poisson_fit <- fit(casual_poisson_workflow, data = zinf_casual_df_dirty)
+casual_poisson_predictions <- predict(casual_poisson_fit, new_data = test_df_dirty)$.pred %>%
+  `-`(1)
+registered_poisson_fit <- fit(registered_poisson_workflow, data = zinf_registered_df_dirty)
+registered_poisson_predictions <- predict(registered_poisson_fit, new_data = test_df_dirty)$.pred %>%
+  `-`(1)
+
+# Write output
+split_linear_output <- tibble(datetime = test_df_dirty$datetime %>%
+                                format() %>%
+                                as.character(),
+                              count = casual_linear_predictions +
+                                registered_linear_predictions)
+split_linear_output[split_linear_output$count < 0, "count"] <- 0
+vroom_write(split_linear_output, "split_linear_regression.csv", delim = ",")
 
 ########################
 # Penalized regression #
@@ -405,6 +443,34 @@ bart_output <- tibble(datetime = test_df_dirty$datetime %>%
                         as.character(),
                       count = bart_predictions)
 vroom_write(bart_output, "bart_regression.csv", delim = ",")
+
+# Now the same thing but for casual and registered users
+# Create the workflow
+casual_bart_workflow <- workflow() %>%
+  add_model(bart_model) %>%
+  add_recipe(log_casual_recipe)
+registered_bart_workflow <- workflow() %>%
+  add_model(bart_model) %>%
+  add_recipe(log_registered_recipe)
+
+# Fit model and make predictions
+casual_bart_fit <- casual_bart_workflow %>%
+  fit(data = log_casual_df_dirty)
+casual_bart_predictions <- predict(casual_bart_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+registered_bart_fit <- registered_bart_workflow %>%
+  fit(data = log_registered_df_dirty)
+registered_bart_predictions <- predict(registered_bart_fit, new_data = test_df_dirty)$.pred %>%
+  exp()
+
+# Write output
+split_bart_output <- tibble(datetime = test_df_dirty$datetime %>%
+				   format() %>%
+				   as.character(),
+				 count = casual_bart_predictions +
+				   registered_bart_predictions)
+split_bart_output[split_bart_output$count < 0, "count"] <- 0
+vroom_write(split_bart_output, "split_bart_regression.csv", delim = ",")
 
 #######
 # GAM #
