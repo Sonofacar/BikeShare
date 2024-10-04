@@ -179,10 +179,13 @@ registered_poisson_workflow <- workflow() %>%
 
 # Fit model and make predictions
 casual_poisson_fit <- fit(casual_poisson_workflow, data = zinf_casual_df_dirty)
-casual_poisson_predictions <- predict(casual_poisson_fit, new_data = test_df_dirty)$.pred %>%
+casual_poisson_predictions <- predict(casual_poisson_fit,
+                                      new_data = test_df_dirty)$.pred %>%
   `-`(1)
-registered_poisson_fit <- fit(registered_poisson_workflow, data = zinf_registered_df_dirty)
-registered_poisson_predictions <- predict(registered_poisson_fit, new_data = test_df_dirty)$.pred %>%
+registered_poisson_fit <- fit(registered_poisson_workflow,
+                              data = zinf_registered_df_dirty)
+registered_poisson_predictions <- predict(registered_poisson_fit,
+                                          new_data = test_df_dirty)$.pred %>%
   `-`(1)
 
 # Write output
